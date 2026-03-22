@@ -835,14 +835,8 @@ function recalc() {
             <button class="picker-btn bs" onclick="setResult(${b.id},'S')">— Пропуск</button>
             <div style="border-top:0.5px solid var(--border);margin:6px 0"></div>
             <button class="picker-btn" style="color:var(--blue)" onclick="openEditForm(${b.id})">✎ Редагувати</button>
-            <div id="del-confirm-${b.id}" style="display:none;margin-top:4px;padding:6px 4px 2px;border-top:0.5px solid var(--border)">
-              <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Видалити цей запис?</div>
-              <div style="display:flex;gap:6px">
-                <button class="picker-btn bl" style="flex:1;text-align:center" onclick="confirmRemove(${b.id})">Так</button>
-                <button class="picker-btn" style="flex:1;text-align:center" onclick="document.getElementById('del-confirm-${b.id}').style.display='none'">Ні</button>
-              </div>
-            </div>
-            <button class="picker-btn" style="color:var(--red)" onclick="document.getElementById('del-confirm-${b.id}').style.display='block';this.style.display='none'">🗑 Видалити</button>
+            <div style="border-top:0.5px solid var(--border);margin:6px 0"></div>
+            <button class="picker-btn" style="color:var(--red)" onclick="openDeleteModal(${b.id})">🗑 Видалити</button>
           </div>
         </td>
         <td style="white-space:nowrap;color:var(--text2);text-align:center" onmouseenter="showDateTip(${b.id},this)" onmouseleave="hideDateTip()">${b.date}${b.time ? `<br><span style="font-size:11px;color:var(--text3)">${b.time}</span>` : ''}</td>
@@ -1630,6 +1624,46 @@ function saveEdit(id) {
   b.odds  = odds;
   b.stake = stake;
   document.getElementById('editOverlay').remove();
+  save();
+  recalc();
+}
+
+function openDeleteModal(id) {
+  document.querySelectorAll('[id^="picker-"]').forEach(el => el.style.display = 'none');
+  const b = state.bets.find(x => x.id === id);
+  if (!b) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'deleteOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:360px;border:1px solid var(--border2);box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">Видалити подію</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:18px">#${b.num} · ${b.event}</div>
+      <input id="deletePwd" type="password" placeholder="Пароль" style="width:100%;margin-bottom:10px" autofocus onkeydown="if(event.key==='Enter')confirmRemoveById(${id})">
+      <div id="deleteErr" style="font-size:12px;color:var(--red);margin-bottom:10px;display:none">Невірний пароль</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('deleteOverlay').remove()" style="padding:8px 16px">Скасувати</button>
+        <button class="danger" onclick="confirmRemoveById(${id})" style="padding:8px 16px">Видалити</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  setTimeout(() => document.getElementById('deletePwd').focus(), 50);
+}
+
+function confirmRemoveById(id) {
+  const pwd = document.getElementById('deletePwd').value;
+  if (pwd !== '1727') {
+    const err = document.getElementById('deleteErr');
+    err.style.display = 'block';
+    document.getElementById('deletePwd').value = '';
+    document.getElementById('deletePwd').focus();
+    return;
+  }
+  document.getElementById('deleteOverlay').remove();
+  state.bets = state.bets.filter(b => b.id !== id);
+  state.bets.forEach((b, i) => { b.num = i + 1; });
   save();
   recalc();
 }

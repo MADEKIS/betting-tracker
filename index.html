@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="uk" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -31,83 +31,84 @@
     --radius-lg: 10px;
   }
 
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg:      #FAFAF8;
-      --bg2:     #FFFFFF;
-      --bg3:     #F4F3EF;
-      --bg4:     #ECEAE4;
-      --border:  rgba(0,0,0,0.07);
-      --border2: rgba(0,0,0,0.13);
-      --border3: rgba(0,0,0,0.22);
-      --text:    #141412;
-      --text2:   #787870;
-      --text3:   #BEBEB8;
-      --accent:  #0057FF;
-      --accent2: rgba(0,87,255,0.08);
-      --green:   #1A9E6B;
-      --red:     #D93B3B;
-      --amber:   #B87400;
-      --blue:    #0057FF;
-      --radius:  6px;
-      --radius-lg: 10px;
-    }
 
-    body { background: var(--bg); }
+  [data-theme="light"] {
+    --bg:      #FAFAF8;
+    --bg2:     #FFFFFF;
+    --bg3:     #F4F3EF;
+    --bg4:     #ECEAE4;
+    --border:  rgba(0,0,0,0.07);
+    --border2: rgba(0,0,0,0.13);
+    --border3: rgba(0,0,0,0.22);
+    --text:    #141412;
+    --text2:   #787870;
+    --text3:   #BEBEB8;
+    --accent:  #0057FF;
+    --accent2: rgba(0,87,255,0.08);
+    --green:   #1A9E6B;
+    --red:     #D93B3B;
+    --amber:   #B87400;
+    --blue:    #0057FF;
+  }
 
-    .card {
-      background: var(--bg2);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 1px var(--border);
-      border: none;
-    }
-    .card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px var(--border2); }
+  [data-theme="light"] body { background: var(--bg); }
 
-    .metric {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      box-shadow: none;
-    }
-    .metric:hover { background: var(--bg4); border-color: var(--border2); }
+  [data-theme="light"] .card {
+    background: var(--bg2);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 1px var(--border);
+    border: none;
+  }
+  [data-theme="light"] .card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px var(--border2); }
+  [data-theme="light"] .metric { background: var(--bg3); border: 1px solid var(--border); box-shadow: none; }
+  [data-theme="light"] .metric:hover { background: var(--bg4); border-color: var(--border2); }
+  [data-theme="light"] button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  [data-theme="light"] button.primary:hover { background: #0040CC; border-color: #0040CC; opacity: 1; }
+  [data-theme="light"] .active-cur { background: var(--accent); color: #fff; border-color: var(--accent); }
+  [data-theme="light"] .active-cur:hover { background: #0040CC; opacity: 1; }
+  [data-theme="light"] .num-clickable:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  [data-theme="light"] input:focus,
+  [data-theme="light"] select:focus { border-color: var(--accent); }
+  [data-theme="light"] .bw { background: #E8F8F1; color: #1A7A52; }
+  [data-theme="light"] .bl { background: #FDEAEA; color: #B02B2B; }
+  [data-theme="light"] .bp { background: #FEF4E2; color: #8C5800; }
+  [data-theme="light"] .bs { background: #E6EFFF; color: #0047CC; }
+  [data-theme="light"] .pill-green { background: #E8F8F1; color: #1A7A52; }
+  [data-theme="light"] .pill-red   { background: #FDEAEA; color: #B02B2B; }
+  [data-theme="light"] .pill-blue  { background: #E6EFFF; color: #0047CC; }
+  [data-theme="light"] .pill-gray  { background: var(--bg4); color: var(--text2); }
+  [data-theme="light"] .picker-btn.bw:hover { background: #E8F8F1; color: #1A7A52; }
+  [data-theme="light"] .picker-btn.bl:hover { background: #FDEAEA; color: #B02B2B; }
+  [data-theme="light"] .picker-btn.bp:hover { background: #FEF4E2; color: #8C5800; }
+  [data-theme="light"] .picker-btn.bs:hover { background: #E6EFFF; color: #0047CC; }
+  [data-theme="light"] ::-webkit-scrollbar-track { background: var(--bg3); }
+  [data-theme="light"] ::-webkit-scrollbar-thumb { background: var(--bg4); }
 
-    button.primary {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-    button.primary:hover { background: #0040CC; border-color: #0040CC; opacity: 1; }
-
-    .active-cur {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-    .active-cur:hover { background: #0040CC; opacity: 1; }
-
-    .num-clickable:hover {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-
-    input:focus, select:focus { border-color: var(--accent); }
-
-    .bw { background: #E8F8F1; color: #1A7A52; }
-    .bl { background: #FDEAEA; color: #B02B2B; }
-    .bp { background: #FEF4E2; color: #8C5800; }
-    .bs { background: #E6EFFF; color: #0047CC; }
-
-    .pill-green { background: #E8F8F1; color: #1A7A52; }
-    .pill-red   { background: #FDEAEA; color: #B02B2B; }
-    .pill-blue  { background: #E6EFFF; color: #0047CC; }
-    .pill-gray  { background: var(--bg4); color: var(--text2); }
-
-    .picker-btn.bw:hover { background: #E8F8F1; color: #1A7A52; }
-    .picker-btn.bl:hover { background: #FDEAEA; color: #B02B2B; }
-    .picker-btn.bp:hover { background: #FEF4E2; color: #8C5800; }
-    .picker-btn.bs:hover { background: #E6EFFF; color: #0047CC; }
-
-    ::-webkit-scrollbar-track { background: var(--bg3); }
-    ::-webkit-scrollbar-thumb { background: var(--bg4); }
+  .theme-btn {
+    font-size: 14px;
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    line-height: 1;
+    min-width: 32px;
+    text-align: center;
+    transition: all 0.2s;
+    background: #1C1C1A;
+    border: 1px solid rgba(255,255,255,0.14);
+    color: #8A8A84;
+  }
+  .theme-btn:hover {
+    background: #FAFAF8;
+    border-color: rgba(0,0,0,0.13);
+    color: #141412;
+  }
+  [data-theme="light"] .theme-btn {
+    background: #F4F3EF;
+    border: 1px solid rgba(0,0,0,0.13);
+    color: #787870;
+  }
+  [data-theme="light"] .theme-btn:hover {
+    background: #1C1C1A;
+    border-color: rgba(255,255,255,0.14);
+    color: #F0F0EC;
   }
 
   body {
@@ -115,12 +116,12 @@
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
-    padding: 28px 18px;
+    padding: 28px 24px;
     font-size: 14px;
     line-height: 1.5;
   }
 
-  .container { max-width: 1120px; margin: 0 auto; }
+  .container { width: 100%; }
 
   h1 {
     font-size: 22px;
@@ -154,6 +155,7 @@
     flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 24px;
+    width: 100%;
   }
 
   .header-right {
@@ -162,6 +164,7 @@
     gap: 8px;
     font-size: 13px;
     color: var(--text2);
+    margin-left: auto;
   }
 
   input, select {
@@ -449,7 +452,7 @@
       <h1>📊 Betting Tracker</h1>
       <p class="sub">Ординари · 1/4 Kelly · ROI-ціль 4–7%</p>
     </div>
-    <div class="header-right" style="align-items:center;justify-content:flex-end">
+    <div class="header-right">
       <span>Початковий банкрол:</span>
       <input type="number" id="startBank" value="10000" style="width:110px" onchange="save();recalc()">
       <div style="display:flex;gap:3px;margin-left:4px;position:relative" id="currencyBtns">
@@ -466,7 +469,7 @@
           <div id="rateTipContent"></div>
         </div>
       </div>
-      <span style="font-size:11px;color:var(--text3);opacity:0;transition:opacity 0.3s" id="saveStatus">✓ збережено</span>
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" onmouseenter="hoverThemeBtn(true)" onmouseleave="hoverThemeBtn(false)" title="Перемкнути тему" style="margin-left:8px">🌙</button>
     </div>
   </div>
   <div style="height:16px;display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px;margin-top:-8px">
@@ -567,7 +570,35 @@
 <script>
 const STORAGE_KEY = 'bettingTrackerData_v1';
 
-let _toastTimer;
+function hoverThemeBtn(isHover) {
+  const btn = document.getElementById('themeBtn');
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  if (isHover) {
+    btn.textContent = isDark ? '☀️' : '🌙';
+  } else {
+    btn.textContent = isDark ? '🌙' : '☀️';
+  }
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isLight = html.getAttribute('data-theme') === 'light';
+  const newTheme = isLight ? 'dark' : 'light';
+  html.setAttribute('data-theme', newTheme);
+  document.getElementById('themeBtn').textContent = newTheme === 'dark' ? '🌙' : '☀️';
+  try { localStorage.setItem('bt_theme', newTheme); } catch(e) {}
+}
+
+function initTheme() {
+  try {
+    const saved = localStorage.getItem('bt_theme');
+    if (saved === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.getElementById('themeBtn').textContent = '☀️';
+    }
+  } catch(e) {}
+}
+
 function showToast(msg) {
   let toast = document.getElementById('saveToast');
   if (!toast) {
@@ -1796,6 +1827,7 @@ function download(filename, content, mime) {
   URL.revokeObjectURL(url);
 }
 
+initTheme();
 initCurrency();
 fetchRates();
 recalc();

@@ -570,6 +570,77 @@
 <script>
 const STORAGE_KEY = 'bettingTrackerData_v1';
 
+// ── Supabase config ──────────────────────────────────────────
+const SB_URL = 'https://ladmrzppiyodpkkxgmdz.supabase.co';
+const SB_KEY = 'sb_publishable_WCuHXToi_cYcIX_kgbsbzA_ajxod_O1';
+const APP_PASSWORD = '1727';
+
+async function sbFetch(path, opts = {}) {
+  const res = await fetch(SB_URL + path, {
+    ...opts,
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error(t); }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+async function dbLoadBets() {
+  const rows = await sbFetch('/rest/v1/bets?order=num.asc');
+  return (rows || []).map(r => ({
+    id: r.id, num: r.num, date: r.date || '—', time: r.time || '',
+    event: r.event, bet: r.bet || '—',
+    odds: parseFloat(r.odds) || 0, stake: parseFloat(r.stake) || 0,
+    result: r.result || 'pending'
+  }));
+}
+
+async function dbLoadSettings() {
+  const rows = await sbFetch('/rest/v1/settings?select=key,value');
+  const obj = {};
+  (rows || []).forEach(r => { obj[r.key] = r.value; });
+  return obj;
+}
+
+async function dbSaveSettings(key, value) {
+  await sbFetch('/rest/v1/settings', {
+    method: 'POST',
+    headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify({ key, value: String(value) })
+  });
+}
+
+async function dbUpsertBet(b) {
+  await sbFetch('/rest/v1/bets', {
+    method: 'POST',
+    headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify({
+      id: b.id, num: b.num, date: b.date, time: b.time || '',
+      event: b.event, bet: b.bet, odds: b.odds, stake: b.stake, result: b.result
+    })
+  });
+}
+
+async function dbDeleteBet(id) {
+  await sbFetch(`/rest/v1/bets?id=eq.${id}`, { method: 'DELETE' });
+}
+
+async function dbRenumberBets(bets) {
+  for (const b of bets) {
+    await sbFetch(`/rest/v1/bets?id=eq.${b.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ num: b.num })
+    });
+  }
+}
+// ─────────────────────────────────────────────────────────────
+
 function hoverThemeBtn(isHover) {
   const btn = document.getElementById('themeBtn');
   const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
@@ -631,18 +702,25 @@ const DEFAULT_BETS = [
   {id:10, num:10, date:'21.03.26', event:'Севілья – Валенсія',      bet:'—',                     odds:0,    stake:0,   result:'S'},
 ];
 
-function loadData() {
+async function loadData() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch(e) {}
-  return { startBank: 10000, bets: DEFAULT_BETS, nextId: 11 };
+    const [bets, settings] = await Promise.all([dbLoadBets(), dbLoadSettings()]);
+    return {
+      startBank: parseFloat(settings.startBank) || 10000,
+      currCode:  settings.currCode  || 'UAH',
+      currSymbol: settings.currSymbol || '₴',
+      bets,
+      nextId: bets.length > 0 ? Math.max(...bets.map(b => b.id)) + 1 : 1
+    };
+  } catch(e) {
+    console.error('Supabase load error:', e);
+    return { startBank: 10000, bets: [], nextId: 1 };
+  }
 }
 
-let state = loadData();
-let currSymbol = state.currSymbol || '₴';
-let currCode   = state.currCode   || 'UAH';
-document.getElementById('startBank').value = state.startBank;
+let state = { startBank: 10000, bets: [], nextId: 1 };
+let currSymbol = '₴';
+let currCode   = 'UAH';
 
 let rates = { UAH: 1, USD: 0.0241, EUR: 0.0222 };
 let ratesLoaded = false;
@@ -717,7 +795,9 @@ function setCurrency(code, sym) {
   state.currCode = code; state.currSymbol = sym;
   document.querySelectorAll('.cur-btn').forEach(b => b.classList.remove('active-cur'));
   document.getElementById(`btn-${code}`).classList.add('active-cur');
-  save(); recalc();
+  dbSaveSettings('currCode', code);
+  dbSaveSettings('currSymbol', sym);
+  recalc();
 }
 
 function initCurrency() {
@@ -728,14 +808,18 @@ function initCurrency() {
   if (btn) btn.classList.add('active-cur');
 }
 
-function save() {
+async function save() {
   state.startBank = parseFloat(document.getElementById('startBank').value) || 10000;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    await Promise.all([
+      dbSaveSettings('startBank', state.startBank),
+      dbSaveSettings('currCode',  currCode),
+      dbSaveSettings('currSymbol', currSymbol)
+    ]);
     const el = document.getElementById('saveStatusBelow');
     el.textContent = '✓ збережено';
     setTimeout(() => { el.textContent = ''; }, 1500);
-  } catch(e) {}
+  } catch(e) { console.error('Save error:', e); }
 }
 
 function pnl(b) {
@@ -1532,7 +1616,7 @@ function normalizeDate(raw) {
   return raw;
 }
 
-function addBet() {
+async function addBet() {
   const dt = normalizeDate(document.getElementById('iDate').value.trim());
   const tm = document.getElementById('iTime').value.trim() || '';
   const ev = normalizeEvent(document.getElementById('iEvent').value.trim());
@@ -1542,15 +1626,17 @@ function addBet() {
   const rs = document.getElementById('iResult').value;
   if (!ev) { alert('Заповни назву події'); return; }
   const newNum = state.bets.length > 0 ? Math.max(...state.bets.map(b => b.num)) + 1 : 1;
-  state.bets.push({ id: state.nextId++, num: newNum, date: dt, time: tm, event: ev, bet: bt || '—', odds: od, stake: st, result: rs });
+  const newBet = { id: state.nextId++, num: newNum, date: dt, time: tm, event: ev, bet: bt || '—', odds: od, stake: st, result: rs };
+  state.bets.push(newBet);
   document.getElementById('iDate').value  = '';
   document.getElementById('iTime').value  = '';
   document.getElementById('iEvent').value = '';
   document.getElementById('iBet').value   = '';
   document.getElementById('iOdds').value  = '';
   document.getElementById('iStake').value = '';
-  save();
   recalc();
+  await dbUpsertBet(newBet);
+  showToast('✓ Збережено');
 }
 
 function openEditForm(id) {
@@ -1607,7 +1693,7 @@ function openEditForm(id) {
   document.getElementById('edit-event').focus();
 }
 
-function saveEdit(id) {
+async function saveEdit(id) {
   const b = state.bets.find(x => x.id === id);
   if (!b) return;
   const dt    = normalizeDate(document.getElementById('edit-date').value.trim()) || b.date;
@@ -1617,15 +1703,11 @@ function saveEdit(id) {
   const odds  = parseFloat(document.getElementById('edit-odds').value) || 0;
   const stake = parseFloat(document.getElementById('edit-stake').value) || 0;
   if (!ev) { alert('Назва події не може бути порожньою'); return; }
-  b.date  = dt;
-  b.time  = tm;
-  b.event = ev;
-  b.bet   = bet || '—';
-  b.odds  = odds;
-  b.stake = stake;
+  b.date = dt; b.time = tm; b.event = ev; b.bet = bet || '—'; b.odds = odds; b.stake = stake;
   document.getElementById('editOverlay').remove();
-  save();
   recalc();
+  await dbUpsertBet(b);
+  showToast('✓ Збережено');
 }
 
 function openDeleteModal(id) {
@@ -1652,9 +1734,9 @@ function openDeleteModal(id) {
   setTimeout(() => document.getElementById('deletePwd').focus(), 50);
 }
 
-function confirmRemoveById(id) {
+async function confirmRemoveById(id) {
   const pwd = document.getElementById('deletePwd').value;
-  if (pwd !== '1727') {
+  if (pwd !== APP_PASSWORD) {
     const err = document.getElementById('deleteErr');
     err.style.display = 'block';
     document.getElementById('deletePwd').value = '';
@@ -1664,16 +1746,19 @@ function confirmRemoveById(id) {
   document.getElementById('deleteOverlay').remove();
   state.bets = state.bets.filter(b => b.id !== id);
   state.bets.forEach((b, i) => { b.num = i + 1; });
-  save();
   recalc();
+  await dbDeleteBet(id);
+  await dbRenumberBets(state.bets);
+  showToast('✓ Видалено');
 }
 
 function confirmRemove(id) {
   state.bets = state.bets.filter(b => b.id !== id);
   state.bets.forEach((b, i) => { b.num = i + 1; });
   document.querySelectorAll('[id^="picker-"]').forEach(el => el.style.display = 'none');
-  save();
   recalc();
+  dbDeleteBet(id).then(() => dbRenumberBets(state.bets));
+}
 }
 
 function removeBet(id) {
@@ -1729,12 +1814,15 @@ function toggleResultPicker(id) {
   }
 }
 
-function setResult(id, result) {
+async function setResult(id, result) {
   const bet = state.bets.find(b => b.id === id);
   if (bet) { bet.result = result; }
   document.querySelectorAll('[id^="picker-"]').forEach(el => el.style.display = 'none');
-  save();
   recalc();
+  if (bet) {
+    await dbUpsertBet(bet);
+    showToast('✓ Збережено');
+  }
 }
 
 document.addEventListener('click', e => {
@@ -1837,9 +1925,9 @@ function clearAll() {
   setTimeout(() => document.getElementById('clearPwd').focus(), 50);
 }
 
-function confirmClear() {
+async function confirmClear() {
   const pwd = document.getElementById('clearPwd').value;
-  if (pwd !== '1727') {
+  if (pwd !== APP_PASSWORD) {
     const err = document.getElementById('clearErr');
     err.style.display = 'block';
     document.getElementById('clearPwd').value = '';
@@ -1849,8 +1937,12 @@ function confirmClear() {
   document.getElementById('clearOverlay').remove();
   state = { startBank: 10000, bets: [], nextId: 1 };
   document.getElementById('startBank').value = 10000;
-  save();
   recalc();
+  try {
+    await sbFetch('/rest/v1/bets?id=gte.0', { method: 'DELETE' });
+    await dbSaveSettings('startBank', 10000);
+    showToast('✓ Очищено');
+  } catch(e) { console.error(e); }
 }
 
 function download(filename, content, mime) {
@@ -1861,10 +1953,72 @@ function download(filename, content, mime) {
   URL.revokeObjectURL(url);
 }
 
+// ── Login & Init ──────────────────────────────────────────────
+function showLoginScreen() {
+  const overlay = document.createElement('div');
+  overlay.id = 'loginOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML = `
+    <div style="text-align:center;max-width:320px;width:100%">
+      <div style="font-size:28px;margin-bottom:8px">📊</div>
+      <div style="font-size:20px;font-weight:600;color:var(--text);margin-bottom:4px">Betting Tracker</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:28px">1/4 Kelly · ROI-ціль 4–7%</div>
+      <input id="loginPwd" type="password" placeholder="Пароль" style="width:100%;margin-bottom:10px;text-align:center;font-size:16px;padding:10px 14px" onkeydown="if(event.key==='Enter')doLogin()">
+      <div id="loginErr" style="font-size:12px;color:var(--red);margin-bottom:10px;display:none">Невірний пароль</div>
+      <button class="primary" onclick="doLogin()" style="width:100%;padding:10px;font-size:14px">Увійти</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('loginPwd').focus(), 100);
+}
+
+async function doLogin() {
+  const pwd = document.getElementById('loginPwd').value;
+  if (pwd !== APP_PASSWORD) {
+    document.getElementById('loginErr').style.display = 'block';
+    document.getElementById('loginPwd').value = '';
+    document.getElementById('loginPwd').focus();
+    return;
+  }
+  document.getElementById('loginOverlay').innerHTML = `
+    <div style="text-align:center;color:var(--text2);font-size:14px">
+      <div style="font-size:28px;margin-bottom:12px">📊</div>
+      Завантаження...
+    </div>
+  `;
+  await initApp();
+}
+
+async function initApp() {
+  try {
+    state = await loadData();
+    currSymbol = state.currSymbol || '₴';
+    currCode   = state.currCode   || 'UAH';
+    document.getElementById('startBank').value = state.startBank;
+    const lo = document.getElementById('loginOverlay');
+    if (lo) lo.remove();
+    initTheme();
+    initCurrency();
+    fetchRates();
+    recalc();
+  } catch(e) {
+    console.error(e);
+    const lo = document.getElementById('loginOverlay');
+    if (lo) lo.innerHTML = `<div style="color:var(--red);text-align:center;padding:20px">Помилка підключення до бази даних.<br><small>${e.message}</small></div>`;
+  }
+}
+
+// Also save startBank changes to Supabase
+document.getElementById('startBank').addEventListener('change', () => {
+  const val = parseFloat(document.getElementById('startBank').value) || 10000;
+  state.startBank = val;
+  dbSaveSettings('startBank', val);
+  recalc();
+});
+
 initTheme();
-initCurrency();
+showLoginScreen();
 fetchRates();
-recalc();
 </script>
 </body>
 </html>

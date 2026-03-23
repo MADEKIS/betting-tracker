@@ -454,7 +454,7 @@
     </div>
     <div class="header-right">
       <span>Початковий банкрол:</span>
-      <input type="number" id="startBank" value="10000" style="width:110px" onchange="save();recalc()">
+      <input type="number" id="startBank" value="10000" style="width:110px">
       <div style="display:flex;gap:3px;margin-left:4px;position:relative" id="currencyBtns">
         <div class="cur-wrap" onmouseenter="showRateTip('UAH')" onmouseleave="hideRateTip()">
           <button onclick="setCurrency('UAH','₴')" id="btn-UAH" class="cur-btn active-cur">₴</button>
@@ -829,6 +829,7 @@ function pnl(b) {
 }
 
 function recalc() {
+  if (!state || !state.bets) return;
   const start = parseFloat(document.getElementById('startBank').value) || 10000;
   const filterR = document.getElementById('filterResult').value;
   const filterS = document.getElementById('filterSearch').value.toLowerCase();
@@ -1765,8 +1766,8 @@ function removeBet(id) {
   state.bets = state.bets.filter(b => b.id !== id);
   state.bets.forEach((b, i) => { b.num = i + 1; });
   document.querySelectorAll('[id^="picker-"]').forEach(el => el.style.display = 'none');
-  save();
   recalc();
+  dbDeleteBet(id).then(() => dbRenumberBets(state.bets));
 }
 
 function toggleResultPicker(id) {
@@ -1894,8 +1895,10 @@ function importJSON() {
         if (!data.bets) throw new Error();
         state = data;
         document.getElementById('startBank').value = state.startBank;
-        save();
+        // Sync imported data to Supabase
         recalc();
+        for (const b of state.bets) { await dbUpsertBet(b); }
+        await dbSaveSettings('startBank', state.startBank);
         alert('Дані відновлено успішно!');
       } catch { alert('Помилка: невалідний файл'); }
     };
@@ -2008,7 +2011,6 @@ async function initApp() {
   }
 }
 
-// Also save startBank changes to Supabase
 document.getElementById('startBank').addEventListener('change', () => {
   const val = parseFloat(document.getElementById('startBank').value) || 10000;
   state.startBank = val;

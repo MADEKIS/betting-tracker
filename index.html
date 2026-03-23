@@ -264,6 +264,18 @@
   .col-stake  { width: 72px; }
   .col-result { width: 88px; }
   .col-pnl    { width: 80px; }
+
+  @media (max-width: 600px) {
+    .overflow-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { table-layout: auto; min-width: 560px; font-size: 11.5px; }
+    .col-num    { width: 36px; }
+    .col-date   { width: 64px; }
+    .col-odds   { width: 50px; }
+    .col-stake  { width: 60px; }
+    .col-result { width: 76px; }
+    .col-pnl    { width: 68px; }
+    td, th      { padding: 7px 5px; }
+  }
   th {
     text-align: left;
     font-weight: 700;
@@ -739,15 +751,27 @@ const TEST_BETS = [
 async function loadData() {
   try {
     const [bets, settings] = await Promise.all([dbLoadBets(), dbLoadSettings()]);
-    return {
+    const data = {
       startBank: parseFloat(settings.startBank) || 10000,
       currCode:  settings.currCode  || 'UAH',
       currSymbol: settings.currSymbol || '₴',
       bets,
       nextId: bets.length > 0 ? Math.max(...bets.map(b => b.id)) + 1 : 1
     };
+    // Cache to localStorage
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+    return data;
   } catch(e) {
     console.error('Supabase load error:', e);
+    // Fallback to localStorage cache
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        showToast('⚠️ Офлайн — показано кешовані дані');
+        return cached;
+      }
+    } catch(e2) {}
     return { startBank: 10000, bets: [], nextId: 1 };
   }
 }

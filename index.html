@@ -117,6 +117,9 @@
     color: var(--text);
     min-height: 100vh;
     padding: 28px 24px;
+  }
+  @media (max-width: 480px) {
+    body { padding: 16px 10px; }
     font-size: 14px;
     line-height: 1.5;
   }
@@ -350,7 +353,22 @@
     gap: 8px;
     align-items: center;
   }
-  @media (max-width: 800px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 800px) {
+    .form-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (max-width: 480px) {
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+    .form-grid input,
+    .form-grid select,
+    .form-grid button {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  }
 
   .overflow-x { overflow-x: auto; }
 

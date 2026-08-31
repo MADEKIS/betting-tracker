@@ -974,7 +974,7 @@ function recalc() {
       return `<tr id="row-${b.id}">
         <td style="text-align:center;overflow:visible">
           <span class="num-badge num-clickable" style="${numStyle}" title="${numTitle}" onclick="toggleResultPicker(${b.id})">${b.num}</span>
-          <div id="picker-${b.id}" style="display:none;position:absolute;z-index:100;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);box-shadow:0 8px 32px rgba(0,0,0,0.4);padding:8px;min-width:130px">
+          <div id="picker-${b.id}" style="display:none;position:fixed;z-index:9999;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);box-shadow:0 8px 32px rgba(0,0,0,0.4);padding:8px;min-width:160px">
             <div style="font-size:11px;color:var(--text2);margin-bottom:6px;padding:0 4px">Змінити результат:</div>
             <button class="picker-btn bw" onclick="setResult(${b.id},'W')">✓ Виграш</button>
             <button class="picker-btn bl" onclick="setResult(${b.id},'L')">✗ Програш</button>
@@ -1750,16 +1750,24 @@ async function processBulkPaste() {
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   if (!lines.length) return;
 
+  document.getElementById('bulkOverlay').remove();
+
   let added = 0, failed = 0;
   for (const line of lines) {
     const compact = parseCompactPaste(line);
     if (compact && compact.event && compact.odds > 0) {
+      // Clear all fields first
+      ['iDate','iTime','iEvent','iBet','iOdds','iStake'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('iResult').value = 'pending';
+
       document.getElementById('iDate').value  = compact.date;
       document.getElementById('iTime').value  = compact.time;
       document.getElementById('iEvent').value = compact.event;
       document.getElementById('iBet').value   = compact.bet;
       document.getElementById('iOdds').value  = compact.odds.toFixed(2);
-      document.getElementById('iStake').value = compact.stake || '';
+      document.getElementById('iStake').value = compact.stake > 0 ? compact.stake : '';
       await addBet();
       added++;
     } else {
@@ -1767,7 +1775,6 @@ async function processBulkPaste() {
     }
   }
 
-  document.getElementById('bulkOverlay').remove();
   if (added > 0) showToast(`✓ Додано ${added} ${added === 1 ? 'ставку' : added < 5 ? 'ставки' : 'ставок'}${failed ? ' · ' + failed + ' не розпізнано' : ''}`);
 }
 
@@ -1982,45 +1989,28 @@ function toggleResultPicker(id) {
   const picker = document.getElementById(`picker-${id}`);
   const isOpen = picker.style.display !== 'none';
   document.querySelectorAll('[id^="picker-"]').forEach(el => el.style.display = 'none');
-  document.querySelectorAll('[id^="del-confirm-"]').forEach(el => el.style.display = 'none');
-  document.querySelectorAll('.picker-btn[style*="display:none"]').forEach(el => el.style.display = '');
   if (isOpen) return;
 
   picker.style.display = 'block';
 
-  const badge = picker.previousElementSibling;
-  const badgeRect = badge.getBoundingClientRect();
-  const pickerRect = picker.getBoundingClientRect();
-  const card = document.querySelector('.card table');
-  const cardRect = card ? card.closest('.card').getBoundingClientRect() : null;
+  const badge = document.querySelector(`#row-${id} .num-clickable`);
+  if (!badge) return;
+  const rect = badge.getBoundingClientRect();
+  const pickerH = picker.offsetHeight || 230;
+  const pickerW = picker.offsetWidth  || 165;
+  const vW = window.innerWidth;
+  const vH = window.innerHeight;
 
-  // Reset to default position first
-  picker.style.top = '';
-  picker.style.left = '';
-  picker.style.right = '';
-  picker.style.bottom = '';
+  let left = rect.right + 8;
+  if (left + pickerW > vW - 8) left = rect.left - pickerW - 8;
+  if (left < 8) left = 8;
 
-  if (cardRect) {
-    const pickerH = picker.offsetHeight;
-    const pickerW = picker.offsetWidth;
+  let top = rect.top;
+  if (top + pickerH > vH - 8) top = vH - pickerH - 8;
+  if (top < 8) top = 8;
 
-    // Horizontal: align left to badge, clamp within card
-    let left = 0;
-    const tdRect = picker.parentElement.getBoundingClientRect();
-    let absLeft = tdRect.left - cardRect.left;
-    if (absLeft + pickerW > cardRect.width - 8) {
-      absLeft = cardRect.width - pickerW - 8;
-    }
-    if (absLeft < 4) absLeft = 4;
-    picker.style.left = absLeft + 'px';
-
-    // Vertical: below badge by default, flip up if not enough room
-    const spaceBelow = cardRect.bottom - badgeRect.bottom;
-    if (spaceBelow < pickerH + 8) {
-      picker.style.top = 'auto';
-      picker.style.bottom = (picker.closest('td').offsetHeight) + 'px';
-    }
-  }
+  picker.style.left = left + 'px';
+  picker.style.top  = top  + 'px';
 }
 
 async function setResult(id, result) {

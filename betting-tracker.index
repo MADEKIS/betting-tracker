@@ -1555,11 +1555,13 @@ function parseCompactPaste(raw) {
   if (atIdx === -1) return null;
 
   const afterAt = rest.slice(atIdx + 1).trim();
-  const oddsAndStake = afterAt.match(/^([\d.,]+)\s*[₴$€]\s*([\d,. ]+)/);
+  // Accept numeric stake OR placeholder like [сума] → 0
+  const oddsAndStake = afterAt.match(/^([\d.,]+)\s*[₴$€]\s*(\[.*?\]|[\d,. ]+)/);
   if (!oddsAndStake) return null;
 
   const odds  = parseFloat(oddsAndStake[1]);
-  const stake = parseFloat(oddsAndStake[2].replace(/[,\s]/g, ''));
+  const stakeRaw = oddsAndStake[2].trim();
+  const stake = /^\[/.test(stakeRaw) ? 0 : parseFloat(stakeRaw.replace(/[,\s]/g, ''));
 
   const eventBet = rest.slice(0, atIdx).trimEnd();
 
@@ -1600,7 +1602,7 @@ function handleDatePaste(e) {
       let added = 0;
       for (const line of lines) {
         const compact = parseCompactPaste(line);
-        if (compact && compact.event && compact.odds > 0 && compact.stake > 0) {
+        if (compact && compact.event && compact.odds > 0) {
           document.getElementById('iDate').value  = compact.date;
           document.getElementById('iTime').value  = compact.time;
           document.getElementById('iEvent').value = compact.event;

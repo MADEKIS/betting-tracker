@@ -1544,25 +1544,49 @@ function parseStructuredPaste(text) {
 }
 
 function parseCompactPaste(raw) {
-  // Handles formats:
-  // "28.03.2026 17:00 Вікомб – Порт ВейлВікомб −1.5 @2.35 ₴266"
-  // "28.03.2026 17:00Вікомб – Порт ВейлВікомб −1.5 @ 2.35₴266₴10,630"
-  const rx = /^(\d{1,2}[.,]\d{1,2}[.,]\d{2,4})\s+(\d{1,2}:\d{2})\s*(.+?)\s+(.+?@\s*[\d.,]+)\s*[₴$€]\s*([\d,. ]+)/;
-  const m = raw.match(rx);
-  if (!m) return null;
+  // Format: "28.03.2026 17:00 Team1 – Team2Bet @odds ₴stake"
+  // Team2 and Bet are joined with no space — detected via lowercase→uppercase boundary
+  const dateTimeRx = /^(\d{1,2}[.,]\d{1,2}[.,]\d{2,4})\s+(\d{1,2}:\d{2})\s+/;
+  const dtm = raw.match(dateTimeRx);
+  if (!dtm) return null;
+  const rest = raw.slice(dtm[0].length).trim();
 
-  const datePart  = m[1].replace(/[,]/g, '.');
-  const timePart  = m[2];
-  const eventPart = m[3].trim();
-  const betFull   = m[4].trim();
-  const stakeStr  = m[5].replace(/[,\s]/g, '').trim();
+  const atIdx = rest.lastIndexOf('@');
+  if (atIdx === -1) return null;
 
-  const oddsMatch = betFull.match(/@\s*([\d.]+)\s*$/);
-  const odds  = oddsMatch ? parseFloat(oddsMatch[1]) : 0;
-  const bet   = oddsMatch ? betFull.replace(/@\s*[\d.]+\s*$/, '').trim() : betFull;
-  const stake = parseFloat(stakeStr) || 0;
+  const afterAt = rest.slice(atIdx + 1).trim();
+  // Accept numeric stake OR placeholder like [сума] → 0
+  const oddsAndStake = afterAt.match(/^([\d.,]+)\s*[₴$€]\s*(\[.*?\]|[\d,. ]+)/);
+  if (!oddsAndStake) return null;
 
-  return { date: normalizeDate(datePart), time: timePart, event: normalizeEvent(eventPart), bet, odds, stake };
+  const odds  = parseFloat(oddsAndStake[1]);
+  const stakeRaw = oddsAndStake[2].trim();
+  const stake = /^\[/.test(stakeRaw) ? 0 : parseFloat(stakeRaw.replace(/[,\s]/g, ''));
+
+  const eventBet = rest.slice(0, atIdx).trimEnd();
+
+  const dashRx = /\s[–—]\s/;
+  const dashMatch = eventBet.match(dashRx);
+  if (!dashMatch) return null;
+  const dashIdx = eventBet.indexOf(dashMatch[0]);
+
+  const team1     = eventBet.slice(0, dashIdx).trim();
+  const afterDash = eventBet.slice(dashIdx + dashMatch[0].length);
+
+  // Find lowercase→uppercase boundary (handles Latin and Cyrillic)
+  const boundaryMatch = afterDash.match(/^([\s\S]*?[a-zа-яіїєґ])([A-ZА-ЯІЇЄҐ][\s\S]*)$/);
+  let team2, bet;
+  if (boundaryMatch) {
+    team2 = boundaryMatch[1].trim();
+    bet   = boundaryMatch[2].trim();
+  } else {
+    const sp = afterDash.indexOf(' ');
+    team2 = sp > 0 ? afterDash.slice(0, sp) : afterDash;
+    bet   = sp > 0 ? afterDash.slice(sp + 1).trim() : '';
+  }
+
+  const event = (team1 + ' – ' + team2).trim();
+  return { date: normalizeDate(dtm[1].replace(/,/g,'.')), time: dtm[2], event: normalizeEvent(event), bet: bet.trim(), odds, stake };
 }
 
 function handleDatePaste(e) {
@@ -1578,7 +1602,7 @@ function handleDatePaste(e) {
       let added = 0;
       for (const line of lines) {
         const compact = parseCompactPaste(line);
-        if (compact && compact.event && compact.odds > 0 && compact.stake > 0) {
+        if (compact && compact.event && compact.odds > 0) {
           document.getElementById('iDate').value  = compact.date;
           document.getElementById('iTime').value  = compact.time;
           document.getElementById('iEvent').value = compact.event;

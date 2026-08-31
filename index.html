@@ -1752,30 +1752,43 @@ async function processBulkPaste() {
 
   document.getElementById('bulkOverlay').remove();
 
-  let added = 0, failed = 0;
+  const newBets = [];
   for (const line of lines) {
     const compact = parseCompactPaste(line);
     if (compact && compact.event && compact.odds > 0) {
-      // Clear all fields first
-      ['iDate','iTime','iEvent','iBet','iOdds','iStake'].forEach(id => {
-        document.getElementById(id).value = '';
-      });
-      document.getElementById('iResult').value = 'pending';
-
-      document.getElementById('iDate').value  = compact.date;
-      document.getElementById('iTime').value  = compact.time;
-      document.getElementById('iEvent').value = compact.event;
-      document.getElementById('iBet').value   = compact.bet;
-      document.getElementById('iOdds').value  = compact.odds.toFixed(2);
-      document.getElementById('iStake').value = compact.stake > 0 ? compact.stake : '';
-      await addBet();
-      added++;
-    } else {
-      failed++;
+      const newNum = state.bets.length + newBets.length > 0
+        ? Math.max(...state.bets.map(b => b.num), ...newBets.map(b => b.num), 0) + 1
+        : 1;
+      const newBet = {
+        id: state.nextId++,
+        num: newNum,
+        date: compact.date,
+        time: compact.time,
+        event: compact.event,
+        bet: compact.bet || '—',
+        odds: compact.odds,
+        stake: compact.stake || 0,
+        result: 'pending'
+      };
+      newBets.push(newBet);
+      state.bets.push(newBet);
     }
   }
 
-  if (added > 0) showToast(`✓ Додано ${added} ${added === 1 ? 'ставку' : added < 5 ? 'ставки' : 'ставок'}${failed ? ' · ' + failed + ' не розпізнано' : ''}`);
+  // Clear form fields
+  ['iDate','iTime','iEvent','iBet','iOdds','iStake'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+
+  recalc();
+
+  if (newBets.length > 0) {
+    showToast(`✓ Додано ${newBets.length} ${newBets.length===1?'ставку':newBets.length<5?'ставки':'ставок'}`);
+    // Sync to Supabase in background
+    for (const b of newBets) {
+      try { await dbUpsertBet(b); } catch(e) { console.error('Sync error:', e); }
+    }
+  }
 }
 
 function formEnter(e, nextId) {

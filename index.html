@@ -555,6 +555,10 @@
 
   <div class="card">
     <h2>Додати подію</h2>
+    <div style="margin-bottom:10px">
+      <button onclick="openBulkPaste()" style="font-size:12px;padding:6px 12px;color:var(--accent);border-color:var(--accent)">⚡ Вставити кілька ставок</button>
+      <span style="font-size:11px;color:var(--text3);margin-left:8px">або заповни поля вручну нижче</span>
+    </div>
     <div class="form-grid">
       <input type="text" id="iDate" placeholder="ДД.ММ.РР" value="" oninput="liveNormalizeDate(this)" onblur="liveNormalizeDate(this)" onkeydown="formEnter(event,'iTime')" onpaste="handleDatePaste(event)">
       <input type="text" id="iTime" placeholder="ГГ:ХХ" style="width:100%" onkeydown="formEnter(event,'iEvent')" onpaste="pasteAndFocus(event,'iEvent')">
@@ -1717,6 +1721,54 @@ function handleDatePaste(e) {
       }
     }
   }, 0);
+}
+
+function openBulkPaste() {
+  const overlay = document.createElement('div');
+  overlay.id = 'bulkOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:580px;border:1px solid var(--border2);box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">⚡ Масова вставка ставок</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Встав одну або кілька ставок — кожна з нового рядка</div>
+      <textarea id="bulkText" placeholder="31.08.2026 23:00 Atletico Grau – MelgarMelgar ІТБ(1.0) @1.80 ₴266
+01.09.2026 02:00 Remo – CoritibaCoritiba ІТБ(1.0) @2.12 ₴350" style="width:100%;height:160px;font-family:monospace;font-size:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:10px;resize:vertical;outline:none"></textarea>
+      <div id="bulkErr" style="font-size:12px;color:var(--red);margin-top:8px;display:none"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+        <button onclick="document.getElementById('bulkOverlay').remove()" style="padding:8px 16px">Скасувати</button>
+        <button class="primary" onclick="processBulkPaste()" style="padding:8px 20px">Додати</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  setTimeout(() => document.getElementById('bulkText').focus(), 50);
+}
+
+async function processBulkPaste() {
+  const raw = document.getElementById('bulkText').value.trim();
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (!lines.length) return;
+
+  let added = 0, failed = 0;
+  for (const line of lines) {
+    const compact = parseCompactPaste(line);
+    if (compact && compact.event && compact.odds > 0) {
+      document.getElementById('iDate').value  = compact.date;
+      document.getElementById('iTime').value  = compact.time;
+      document.getElementById('iEvent').value = compact.event;
+      document.getElementById('iBet').value   = compact.bet;
+      document.getElementById('iOdds').value  = compact.odds.toFixed(2);
+      document.getElementById('iStake').value = compact.stake || '';
+      await addBet();
+      added++;
+    } else {
+      failed++;
+    }
+  }
+
+  document.getElementById('bulkOverlay').remove();
+  if (added > 0) showToast(`✓ Додано ${added} ${added === 1 ? 'ставку' : added < 5 ? 'ставки' : 'ставок'}${failed ? ' · ' + failed + ' не розпізнано' : ''}`);
 }
 
 function formEnter(e, nextId) {

@@ -2245,8 +2245,9 @@ async function initApp() {
     recalc();
   } catch(e) {
     console.error(e);
+    _appLoading = false;
     const lo = document.getElementById('loginOverlay');
-    if (lo) lo.innerHTML = `<div style="color:var(--red);text-align:center;padding:20px">Помилка підключення до бази даних.<br><small>${e.message}</small></div>`;
+    if (lo) lo.innerHTML = `<div style="color:var(--red);text-align:center;padding:20px">Помилка підключення до бази даних.<br><small>${e.message}</small><br><br><button onclick="location.reload()">Спробувати ще раз</button></div>`;
   }
 }
 

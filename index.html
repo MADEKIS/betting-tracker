@@ -944,7 +944,7 @@ function recalc() {
     <div class="metric"><div class="metric-label">Банкрол</div><div class="metric-value ${realBankCol}">${dispReal.toLocaleString('uk-UA', {maximumFractionDigits:2})} ${currSymbol}</div>${pendingStr}</div>
     <div class="metric" style="cursor:default" onmouseenter="showMetricTip('pnl',this)" onmouseleave="hideMetricTip()"><div class="metric-label">Прибуток / Збиток</div><div class="metric-value ${pnlCol}">${dispPnl >= 0 ? '+' : ''}${dispPnl.toFixed(currCode==='UAH'?0:2)} ${currSymbol}</div><div style="margin-top:4px;font-size:11px;font-weight:700;color:${pnlCol};font-family:'JetBrains Mono',monospace;letter-spacing:-0.3px">${totalPnl >= 0 ? '+' : ''}${(totalPnl / start * 100).toFixed(2)}%</div>${todayStr2}</div>
     <div class="metric" style="cursor:default" onmouseenter="showMetricTip('roi',this)" onmouseleave="hideMetricTip()"><div class="metric-label">ROI</div><div class="metric-value ${roiCol}">${roi}%</div></div>
-    <div class="metric" style="cursor:default" onmouseenter="showMetricTip('wlps',this)" onmouseleave="hideMetricTip()"><div class="metric-label">В / П / Оч / Пр</div><div class="metric-value">${wins}/${losses}/${pending}/${skips}</div><div style="margin-top:6px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">всього подій: <b style="color:var(--text)">${state.bets.length}</b></div></div>
+    <div class="metric" style="cursor:default" onmouseenter="showMetricTip('wlps',this)" onmouseleave="hideMetricTip()"><div class="metric-label">В / П / Оч / Пр</div><div class="metric-value">${wins}/${losses}/${pending}/${skips}</div><div style="margin-top:6px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">всього подій: <b style="color:var(--text)">${state.bets.length}</b>${state.bets.filter(b=>b.result==='R').length>0?` · поверн: <b style="color:#AAA">${state.bets.filter(b=>b.result==='R').length}</b>`:''}</div></div>
     <div class="metric" style="cursor:default" onmouseenter="showMetricTip('winrate',this,${avgOdds})" onmouseleave="hideMetricTip()"><div class="metric-label">Winrate</div><div class="metric-value">${wr}%</div></div>
     <div class="metric"><div class="metric-label">Сер. коеф.</div><div class="metric-value">${avgOdds}</div></div>
   `;
@@ -1238,6 +1238,7 @@ function showMetricTip(type, el, extra) {
       <div style="font-size:11px;color:var(--text3);margin-top:8px">При сер. коеф. ${ao.toFixed(2)} беззбитковий WR ≈ ${breakeven}%</div>
     `;
   } else if (type === 'wlps') {
+    const returns = state.bets.filter(b => b.result === 'R').length;
     tip.style.minWidth = 'min(220px, calc(100vw - 20px))'; tip.style.maxWidth = 'min(280px, calc(100vw - 20px))';
     tip.innerHTML = `
       <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:10px">Деталізація результатів</div>
@@ -1248,6 +1249,10 @@ function showMetricTip(type, el, extra) {
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px;gap:12px">
         <span style="color:var(--text2)">Програшів</span>
         <b style="color:var(--red)">${losses}</b>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px;gap:12px">
+        <span style="color:var(--text2)">Повернень</span>
+        <b style="color:#AAA">${returns}</b>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px;gap:12px">
         <span style="color:var(--text2)">Очікують</span>

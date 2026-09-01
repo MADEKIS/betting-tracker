@@ -528,6 +528,7 @@
           <option value="W">Виграші</option>
           <option value="L">Програші</option>
           <option value="pending">Очікують</option>
+          <option value="R">Повернення</option>
           <option value="S">Пропуски</option>
         </select>
         <input type="text" id="filterSearch" placeholder="Пошук події..." style="font-size:12px;padding:5px 9px;width:160px" oninput="recalc()">
@@ -570,6 +571,7 @@
         <option value="pending">Очікує</option>
         <option value="W">Виграш</option>
         <option value="L">Програш</option>
+        <option value="R">Повернення</option>
         <option value="S">Пропуск</option>
       </select>
       <button class="primary" onclick="addBet()">+ Додати</button>
@@ -887,6 +889,7 @@ async function save() {
 function pnl(b) {
   if (b.result === 'W') return +(b.stake * (b.odds - 1)).toFixed(2);
   if (b.result === 'L') return -b.stake;
+  if (b.result === 'R') return 0; // Повернення — stake returned, no profit/loss
   return 0;
 }
 
@@ -896,13 +899,16 @@ function recalc() {
   const filterR = document.getElementById('filterResult').value;
   const filterS = document.getElementById('filterSearch').value.toLowerCase();
 
-  const settled = state.bets.filter(b => b.result === 'W' || b.result === 'L');
+  const settled = state.bets.filter(b => b.result === 'W' || b.result === 'L' || b.result === 'R');
   const wins = settled.filter(b => b.result === 'W').length;
   const losses = settled.filter(b => b.result === 'L').length;
   const skips = state.bets.filter(b => b.result === 'S').length;
   const pending = state.bets.filter(b => b.result === 'pending').length;
   const totalPnl = +settled.reduce((s, b) => s + pnl(b), 0).toFixed(2);
   const currentBank = +(start + totalPnl).toFixed(2);
+  // Real bankroll = currentBank minus pending stakes
+  const pendingStake = +state.bets.filter(b => b.result === 'pending').reduce((s,b) => s + b.stake, 0).toFixed(2);
+  const realBank = +(currentBank - pendingStake).toFixed(2);
   const totalStaked = settled.reduce((s, b) => s + b.stake, 0);
   const roi = totalStaked ? +(totalPnl / totalStaked * 100).toFixed(1) : 0;
   const wr = settled.length ? +(wins / settled.length * 100).toFixed(0) : 0;
@@ -914,8 +920,13 @@ function recalc() {
   const bankCol = currentBank >= start ? 'green' : 'red';
 
   const dispBank  = conv(currentBank);
+  const dispReal  = conv(realBank);
   const dispPnl   = conv(totalPnl);
   const dispStart = conv(start);
+  const realBankCol = realBank >= start ? 'green' : 'red';
+  const pendingStr = pendingStake > 0
+    ? `<div style="margin-top:5px;font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.06em">в грі: <b style="color:var(--amber);font-family:'JetBrains Mono',monospace">−${conv(pendingStake).toFixed(currCode==='UAH'?0:2)} ${currSymbol}</b></div>`
+    : '';
 
   // Today's date in DD.MM.YY format
   const now = new Date();
@@ -929,7 +940,7 @@ function recalc() {
     : '';
 
   document.getElementById('metrics').innerHTML = `
-    <div class="metric"><div class="metric-label">Банкрол</div><div class="metric-value ${bankCol}">${dispBank.toLocaleString('uk-UA', {maximumFractionDigits:2})} ${currSymbol}</div></div>
+    <div class="metric"><div class="metric-label">Банкрол</div><div class="metric-value ${realBankCol}">${dispReal.toLocaleString('uk-UA', {maximumFractionDigits:2})} ${currSymbol}</div>${pendingStr}</div>
     <div class="metric" style="cursor:default" onmouseenter="showMetricTip('pnl',this)" onmouseleave="hideMetricTip()"><div class="metric-label">Прибуток / Збиток</div><div class="metric-value ${pnlCol}">${dispPnl >= 0 ? '+' : ''}${dispPnl.toFixed(currCode==='UAH'?0:2)} ${currSymbol}</div><div style="margin-top:4px;font-size:11px;font-weight:700;color:${pnlCol};font-family:'JetBrains Mono',monospace;letter-spacing:-0.3px">${totalPnl >= 0 ? '+' : ''}${(totalPnl / start * 100).toFixed(2)}%</div>${todayStr2}</div>
     <div class="metric" style="cursor:default" onmouseenter="showMetricTip('roi',this)" onmouseleave="hideMetricTip()"><div class="metric-label">ROI</div><div class="metric-value ${roiCol}">${roi}%</div></div>
     <div class="metric" style="cursor:default" onmouseenter="showMetricTip('wlps',this)" onmouseleave="hideMetricTip()"><div class="metric-label">В / П / Оч / Пр</div><div class="metric-value">${wins}/${losses}/${pending}/${skips}</div><div style="margin-top:6px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">всього подій: <b style="color:var(--text)">${state.bets.length}</b></div></div>
@@ -937,15 +948,26 @@ function recalc() {
     <div class="metric"><div class="metric-label">Сер. коеф.</div><div class="metric-value">${avgOdds}</div></div>
   `;
 
+  // Sort filtered bets by date + time
+  function parseDateTimeKey(b) {
+    const d = b.date || '00.00.00';
+    const t = b.time || '00:00';
+    const parts = d.split('.');
+    if (parts.length < 3) return '000000' + t.replace(':','');
+    const yy = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+    return yy + parts[1].padStart(2,'0') + parts[0].padStart(2,'0') + t.replace(':','');
+  }
+
   const filtered = state.bets.filter(b => {
     if (filterR !== 'all' && b.result !== filterR) return false;
     if (filterS && !b.event.toLowerCase().includes(filterS) && !b.bet.toLowerCase().includes(filterS)) return false;
     return true;
-  });
+  }).sort((a, b) => parseDateTimeKey(a).localeCompare(parseDateTimeKey(b)));
 
-  // Build ordered unique dates from ALL bets (not just filtered) for consistent coloring
+  // Build ordered unique dates from sorted bets for consistent coloring
+  const sortedAll = [...state.bets].sort((a,b) => parseDateTimeKey(a).localeCompare(parseDateTimeKey(b)));
   const orderedDates = [];
-  state.bets.forEach(b => { if (b.date && !orderedDates.includes(b.date)) orderedDates.push(b.date); });
+  sortedAll.forEach(b => { if (b.date && !orderedDates.includes(b.date)) orderedDates.push(b.date); });
 
   if (filtered.length === 0) {
     document.getElementById('emptyMsg').style.display = 'block';
@@ -962,10 +984,13 @@ function recalc() {
       const badge = b.result === 'W' ? '<span class="badge bw">Виграш</span>'
         : b.result === 'L' ? '<span class="badge bl">Програш</span>'
         : b.result === 'S' ? '<span class="badge bs">Пропуск</span>'
+        : b.result === 'R' ? '<span class="badge" style="background:rgba(180,180,180,0.12);color:#AAA">Поверн.</span>'
         : '<span class="badge bp">Очікує</span>';
       const dispP = conv(p);
       const pnlStr = (b.result === 'pending' || b.result === 'S')
         ? '<span style="color:var(--text3)">—</span>'
+        : b.result === 'R'
+        ? '<span style="color:var(--text3)">0</span>'
         : `<span class="${p >= 0 ? 'green' : 'red'}">${p >= 0 ? '+' : ''}${dispP.toFixed(currCode==='UAH'?0:2)} ${currSymbol}</span>`;
       const oddsStr = (!b.odds || b.odds === 0) ? '—' : b.odds.toFixed(2);
       const dispStake = conv(b.stake);
@@ -980,6 +1005,7 @@ function recalc() {
             <button class="picker-btn bl" onclick="setResult(${b.id},'L')">✗ Програш</button>
             <button class="picker-btn bp" onclick="setResult(${b.id},'pending')">⏳ Очікує</button>
             <button class="picker-btn bs" onclick="setResult(${b.id},'S')">— Пропуск</button>
+            <button class="picker-btn" style="color:#AAA" onclick="setResult(${b.id},'R')">↩ Повернення</button>
             <div style="border-top:0.5px solid var(--border);margin:6px 0"></div>
             <button class="picker-btn" style="color:var(--blue)" onclick="openEditForm(${b.id})">✎ Редагувати</button>
             <div style="border-top:0.5px solid var(--border);margin:6px 0"></div>
@@ -1002,7 +1028,7 @@ function recalc() {
 
 function getDaySummary(date) {
   const dayBets = state.bets.filter(b => b.date === date);
-  const staked = dayBets.filter(b => b.result === 'W' || b.result === 'L');
+  const staked = dayBets.filter(b => b.result === 'W' || b.result === 'L' || b.result === 'R');
   if (!staked.length) return null;
   const totalStake = staked.reduce((s, b) => s + b.stake, 0);
   const totalPnlDay = +staked.reduce((s, b) => s + pnl(b), 0).toFixed(2);
@@ -1112,7 +1138,7 @@ function showMetricTip(type, el, extra) {
   }
   tip.style.minWidth = 'min(380px, calc(100vw - 20px))';
   tip.style.maxWidth = 'min(400px, calc(100vw - 20px))';
-  const settled = state.bets.filter(b => b.result==='W'||b.result==='L');
+  const settled = state.bets.filter(b => b.result==='W'||b.result==='L'||b.result==='R');
   const wins    = state.bets.filter(b => b.result==='W').length;
   const losses  = state.bets.filter(b => b.result==='L').length;
   const pending = state.bets.filter(b => b.result==='pending').length;
@@ -1122,7 +1148,7 @@ function showMetricTip(type, el, extra) {
     tip.style.minWidth = 'min(240px, calc(100vw - 20px))'; tip.style.maxWidth = 'min(300px, calc(100vw - 20px))';
     // group settled bets by date
     const dayMap = {};
-    state.bets.filter(b => b.result==='W'||b.result==='L').forEach(b => {
+    state.bets.filter(b => b.result==='W'||b.result==='L'||b.result==='R').forEach(b => {
       if (!dayMap[b.date]) dayMap[b.date] = 0;
       dayMap[b.date] += pnl(b);
     });
@@ -1173,7 +1199,7 @@ function showMetricTip(type, el, extra) {
 
     // Projected bankroll at 500 bets using current daily P&L rate
     const startBank = parseFloat(document.getElementById('startBank').value) || 10000;
-    const settled   = state.bets.filter(b => b.result==='W'||b.result==='L');
+    const settled   = state.bets.filter(b => b.result==='W'||b.result==='L'||b.result==='R');
     const totalPnlNow = settled.reduce((s,b)=>s+pnl(b),0);
     const currentBank = startBank + totalPnlNow;
     const totalStaked = settled.reduce((s,b)=>s+b.stake,0);
@@ -1294,7 +1320,7 @@ function renderChart(start) {
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const gridCol = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
   const tickCol = isDark ? '#777' : '#999';
-  const settled = state.bets.filter(b => b.result === 'W' || b.result === 'L');
+  const settled = state.bets.filter(b => b.result === 'W' || b.result === 'L' || b.result === 'R');
 
   let labels = [];
   let points = [];

@@ -1548,27 +1548,25 @@ function parseStructuredPaste(text) {
 }
 
 function parseCompactPaste(raw) {
-  // Format: "28.03.2026 17:00 Team1 – Team2Bet @odds ₴stake"
-  // Team2 and Bet are joined with no space — detected via lowercase→uppercase boundary
+  // Handles formats:
+  // "28.03.2026 17:00 Team1 – Team2Bet @2.35 ₴266"
+  // "02.09.2026 13:00 Team1 – Team2 Bet — SubBet @ 1.68"  (stake optional)
   const dateTimeRx = /^(\d{1,2}[.,]\d{1,2}[.,]\d{2,4})\s+(\d{1,2}:\d{2})\s+/;
   const dtm = raw.match(dateTimeRx);
   if (!dtm) return null;
   const rest = raw.slice(dtm[0].length).trim();
 
-  const atIdx = rest.lastIndexOf('@');
-  if (atIdx === -1) return null;
+  // Extract odds — last number after @
+  const atMatch = rest.match(/@\s*([\d.,]+)\s*(?:[₴$€]\s*(\[.*?\]|[\d,. ]*))?$/);
+  if (!atMatch) return null;
+  const odds  = parseFloat(atMatch[1]);
+  const stakeRaw = atMatch[2] ? atMatch[2].trim() : '';
+  const stake = stakeRaw && !/^\[/.test(stakeRaw) ? parseFloat(stakeRaw.replace(/[,\s]/g,'')) : 0;
 
-  const afterAt = rest.slice(atIdx + 1).trim();
-  // Accept numeric stake OR placeholder like [сума] → 0
-  const oddsAndStake = afterAt.match(/^([\d.,]+)\s*[₴$€]\s*(\[.*?\]|[\d,. ]+)/);
-  if (!oddsAndStake) return null;
+  const eventBet = rest.slice(0, rest.lastIndexOf('@')).trimEnd().replace(/\s+$/, '');
 
-  const odds  = parseFloat(oddsAndStake[1]);
-  const stakeRaw = oddsAndStake[2].trim();
-  const stake = /^\[/.test(stakeRaw) ? 0 : parseFloat(stakeRaw.replace(/[,\s]/g, ''));
-
-  const eventBet = rest.slice(0, atIdx).trimEnd();
-
+  // Find the FIRST "Team1 – Team2" separator (space–dash–space with en/em dash)
+  // But NOT dashes inside the bet part
   const dashRx = /\s[–—]\s/;
   const dashMatch = eventBet.match(dashRx);
   if (!dashMatch) return null;
@@ -1577,20 +1575,39 @@ function parseCompactPaste(raw) {
   const team1     = eventBet.slice(0, dashIdx).trim();
   const afterDash = eventBet.slice(dashIdx + dashMatch[0].length);
 
-  // Find lowercase→uppercase boundary (handles Latin and Cyrillic)
+  // afterDash = "Team2Bet..." or "Team2 Bet..."
+  // Find boundary between team2 and bet:
+  // 1. camelCase boundary (lowercase→uppercase with no space): "MelgarMelgar" → "Melgar|Melgar"
+  // 2. space boundary where next word is a bet keyword
+  const betKeywords = /^(ОЗ|ТМ|ТБ|ІТБ|Тотал|Over|Under|BTTS|Гост|Хаз|Нічия|Win|Пере|М\.|АХ|АФ|Так|Ні)/i;
+
+  // Try camelCase (no-space boundary)
   const boundaryMatch = afterDash.match(/^([\s\S]*?[a-zа-яіїєґ])([A-ZА-ЯІЇЄҐ][\s\S]*)$/);
+
   let team2, bet;
   if (boundaryMatch) {
     team2 = boundaryMatch[1].trim();
     bet   = boundaryMatch[2].trim();
   } else {
-    const sp = afterDash.indexOf(' ');
-    team2 = sp > 0 ? afterDash.slice(0, sp) : afterDash;
-    bet   = sp > 0 ? afterDash.slice(sp + 1).trim() : '';
+    // Split on spaces, find first bet keyword
+    const words = afterDash.split(' ');
+    let splitAt = words.length;
+    for (let i = 1; i < words.length; i++) {
+      if (betKeywords.test(words[i])) { splitAt = i; break; }
+    }
+    if (splitAt < words.length) {
+      team2 = words.slice(0, splitAt).join(' ');
+      bet   = words.slice(splitAt).join(' ').trim();
+    } else {
+      // No keyword found — first word is team2, rest is bet
+      const sp = afterDash.indexOf(' ');
+      team2 = sp > 0 ? afterDash.slice(0, sp) : afterDash;
+      bet   = sp > 0 ? afterDash.slice(sp + 1).trim() : '';
+    }
   }
 
-  const event = (team1 + ' – ' + team2).trim();
-  return { date: normalizeDate(dtm[1].replace(/,/g,'.')), time: dtm[2], event: normalizeEvent(event), bet: bet.trim(), odds, stake };
+  const event = normalizeEvent(team1 + ' – ' + team2);
+  return { date: normalizeDate(dtm[1].replace(/,/g,'.')), time: dtm[2], event, bet: bet.trim(), odds, stake };
 }
 
 function handleDatePaste(e) {
@@ -1800,7 +1817,8 @@ function formEnterSubmit(e) {
 }
 
 function normalizeEvent(str) {
-  return str.replace(/\s*[-—]+\s*/g, ' – ').trim();
+  // Only replace dash/em-dash surrounded by spaces, not hyphens inside words
+  return str.replace(/\s+[–—]\s+/g, ' – ').trim();
 }
 
 function liveNormalizeDate(input) {

@@ -911,7 +911,8 @@ function recalc() {
   const realBank = +(currentBank - pendingStake).toFixed(2);
   const totalStaked = settled.reduce((s, b) => s + b.stake, 0);
   const roi = totalStaked ? +(totalPnl / totalStaked * 100).toFixed(1) : 0;
-  const wr = settled.length ? +(wins / settled.length * 100).toFixed(0) : 0;
+  const wlOnly = wins + losses;
+  const wr = wlOnly ? +(wins / wlOnly * 100).toFixed(0) : 0;
   const stakedbets = state.bets.filter(b => b.odds > 0);
   const avgOdds = stakedbets.length ? +(stakedbets.reduce((s, b) => s + b.odds, 0) / stakedbets.length).toFixed(2) : 0;
 

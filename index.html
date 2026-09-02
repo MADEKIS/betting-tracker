@@ -904,12 +904,14 @@ function recalc() {
   const losses = settled.filter(b => b.result === 'L').length;
   const skips = state.bets.filter(b => b.result === 'S').length;
   const pending = state.bets.filter(b => b.result === 'pending').length;
-  const totalPnl = +settled.reduce((s, b) => s + pnl(b), 0).toFixed(2);
-  const currentBank = +(start + totalPnl).toFixed(2);
+  const totalPnlBank = +settled.reduce((s, b) => s + pnl(b), 0).toFixed(2);
+  const currentBank = +(start + totalPnlBank).toFixed(2);
   // Real bankroll = currentBank minus pending stakes
   const pendingStake = +state.bets.filter(b => b.result === 'pending').reduce((s,b) => s + b.stake, 0).toFixed(2);
   const realBank = +(currentBank - pendingStake).toFixed(2);
-  const totalStaked = settled.reduce((s, b) => s + b.stake, 0);
+  // ROI excludes returns (R)
+  const totalStaked = settled.filter(b => b.result !== 'R').reduce((s, b) => s + b.stake, 0);
+  const totalPnl = +settled.filter(b => b.result !== 'R').reduce((s, b) => s + pnl(b), 0).toFixed(2);
   const roi = totalStaked ? +(totalPnl / totalStaked * 100).toFixed(1) : 0;
   const wlOnly = wins + losses;
   const wr = wlOnly ? +(wins / wlOnly * 100).toFixed(0) : 0;

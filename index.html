@@ -538,14 +538,14 @@
       <table>
         <thead>
           <tr>
-            <th class="col-num" style="text-align:center">#</th>
-            <th class="col-date">Дата</th>
-            <th class="col-event">Подія</th>
-            <th class="col-bet">Ставка</th>
-            <th class="col-odds">Коеф.</th>
-            <th class="col-stake">Сума</th>
-            <th class="col-result">Результат</th>
-            <th class="col-pnl">П/З</th>
+            <th class="col-num" style="text-align:center;cursor:pointer;user-select:none" onclick="setSortCol('num')"># <span id="sort-num"></span></th>
+            <th class="col-date" style="cursor:pointer;user-select:none" onclick="setSortCol('date')">Дата <span id="sort-date">↑</span></th>
+            <th class="col-event" style="cursor:pointer;user-select:none" onclick="setSortCol('event')">Подія <span id="sort-event"></span></th>
+            <th class="col-bet" style="cursor:pointer;user-select:none" onclick="setSortCol('bet')">Ставка <span id="sort-bet"></span></th>
+            <th class="col-odds" style="cursor:pointer;user-select:none" onclick="setSortCol('odds')">Коеф. <span id="sort-odds"></span></th>
+            <th class="col-stake" style="cursor:pointer;user-select:none" onclick="setSortCol('stake')">Сума <span id="sort-stake"></span></th>
+            <th class="col-result" style="cursor:pointer;user-select:none" onclick="setSortCol('result')">Результат <span id="sort-result"></span></th>
+            <th class="col-pnl" style="cursor:pointer;user-select:none" onclick="setSortCol('pnl')">П/З <span id="sort-pnl"></span></th>
           </tr>
         </thead>
         <tbody id="betBody"></tbody>
@@ -894,6 +894,26 @@ function pnl(b) {
   return 0;
 }
 
+let sortCol = 'date';
+let sortDir = 'asc';
+
+function setSortCol(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col;
+    sortDir = col === 'date' ? 'asc' : 'desc';
+  }
+  // Update indicators
+  ['num','date','event','bet','odds','stake','result','pnl'].forEach(c => {
+    const el = document.getElementById('sort-' + c);
+    if (el) el.textContent = '';
+  });
+  const el = document.getElementById('sort-' + col);
+  if (el) el.textContent = sortDir === 'asc' ? '↑' : '↓';
+  recalc();
+}
+
 function recalc() {
   if (!state || !state.bets) return;
   const start = parseFloat(document.getElementById('startBank').value) || 10000;
@@ -947,7 +967,7 @@ function recalc() {
     <div class="metric"><div class="metric-label">Банкрол</div><div class="metric-value ${realBankCol}">${dispReal.toLocaleString('uk-UA', {maximumFractionDigits:2})} ${currSymbol}</div>${pendingStr}</div>
     <div class="metric" style="cursor:default" onmouseenter="showMetricTip('pnl',this)" onmouseleave="hideMetricTip()"><div class="metric-label">Прибуток / Збиток</div><div class="metric-value ${pnlCol}">${dispPnl >= 0 ? '+' : ''}${dispPnl.toFixed(currCode==='UAH'?0:2)} ${currSymbol}</div><div style="margin-top:4px;font-size:11px;font-weight:700;color:${pnlCol};font-family:'JetBrains Mono',monospace;letter-spacing:-0.3px">${totalPnl >= 0 ? '+' : ''}${(totalPnl / start * 100).toFixed(2)}%</div>${todayStr2}</div>
     <div class="metric" style="cursor:default" onmouseenter="showMetricTip('roi',this)" onmouseleave="hideMetricTip()"><div class="metric-label">ROI</div><div class="metric-value ${roiCol}">${roi}%</div></div>
-    <div class="metric" style="cursor:default" onmouseenter="showMetricTip('wlps',this)" onmouseleave="hideMetricTip()"><div class="metric-label">В / П / Оч / Пр</div><div class="metric-value">${wins}/${losses}/${pending}/${skips}</div><div style="margin-top:6px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">всього подій: <b style="color:var(--text)">${state.bets.length}</b></div></div>
+    <div class="metric" style="cursor:default" onmouseenter="showMetricTip('wlps',this)" onmouseleave="hideMetricTip()"><div class="metric-label">В / П / Пов / Оч / Пр</div><div class="metric-value">${wins}/${losses}/${state.bets.filter(b=>b.result==='R').length}/${pending}/${skips}</div><div style="margin-top:6px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">всього подій: <b style="color:var(--text)">${state.bets.length}</b></div></div>
     <div class="metric" style="cursor:default" onmouseenter="showMetricTip('winrate',this,${avgOdds})" onmouseleave="hideMetricTip()"><div class="metric-label">Winrate</div><div class="metric-value">${wr}%</div></div>
     <div class="metric"><div class="metric-label">Сер. коеф.</div><div class="metric-value">${avgOdds}</div></div>
   `;
@@ -966,7 +986,20 @@ function recalc() {
     if (filterR !== 'all' && b.result !== filterR) return false;
     if (filterS && !b.event.toLowerCase().includes(filterS) && !b.bet.toLowerCase().includes(filterS)) return false;
     return true;
-  }).sort((a, b) => parseDateTimeKey(a).localeCompare(parseDateTimeKey(b)));
+  }).sort((a, b) => {
+    let valA, valB;
+    if (sortCol === 'date') { valA = parseDateTimeKey(a); valB = parseDateTimeKey(b); }
+    else if (sortCol === 'num')    { valA = a.num;   valB = b.num; }
+    else if (sortCol === 'event')  { valA = a.event; valB = b.event; }
+    else if (sortCol === 'bet')    { valA = a.bet;   valB = b.bet; }
+    else if (sortCol === 'odds')   { valA = a.odds;  valB = b.odds; }
+    else if (sortCol === 'stake')  { valA = a.stake; valB = b.stake; }
+    else if (sortCol === 'result') { valA = a.result; valB = b.result; }
+    else if (sortCol === 'pnl')    { valA = pnl(a);  valB = pnl(b); }
+    else { valA = parseDateTimeKey(a); valB = parseDateTimeKey(b); }
+    if (typeof valA === 'string') return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    return sortDir === 'asc' ? valA - valB : valB - valA;
+  });
 
   // Build ordered unique dates from sorted bets for consistent coloring
   const sortedAll = [...state.bets].sort((a,b) => parseDateTimeKey(a).localeCompare(parseDateTimeKey(b)));
